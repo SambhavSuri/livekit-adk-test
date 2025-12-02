@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.log
+.DS_Store
+
+# Environment files
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Performance logs
+voice_chat_performance_*.txt
+
+# Temporary files
+*.tmp
+*.wav
+

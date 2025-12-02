@@ -1,0 +1,8 @@
+livekit
+livekit-agents
+livekit-plugins-deepgram
+python-dotenv
+httpx
+pyaudio
+sounddevice
+soundfile

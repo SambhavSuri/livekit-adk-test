@@ -1,0 +1,418 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Loan Recovery Agent - ADK Streaming</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/static/js/app.js" type="module"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 14px;
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 0;
+        min-height: 600px;
+      }
+
+      .status-panel {
+        background: #f8f9fa;
+        border-right: 1px solid #e0e0e0;
+        padding: 20px;
+      }
+
+      .status-section {
+        margin-bottom: 24px;
+      }
+
+      .status-section h3 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #666;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+      }
+
+      .status-indicator.active {
+        border-color: #667eea;
+        background: #f0f3ff;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ccc;
+        margin-right: 10px;
+        transition: all 0.3s ease;
+      }
+
+      .status-indicator.active .status-dot {
+        background: #667eea;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      .status-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+      }
+
+      .timing-info {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 12px;
+      }
+
+      .timing-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+
+      .timing-row:last-child {
+        border-bottom: none;
+      }
+
+      .timing-label {
+        color: #666;
+      }
+
+      .timing-value {
+        font-weight: 600;
+        color: #333;
+      }
+
+      .speech-display {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        min-height: 60px;
+        font-size: 14px;
+        color: #333;
+        line-height: 1.6;
+        border: 2px solid #e0e0e0;
+        transition: border-color 0.3s ease;
+      }
+
+      .speech-display.listening {
+        border-color: #667eea;
+        background: #f0f3ff;
+      }
+
+      .speech-display-label {
+        font-size: 11px;
+        color: #999;
+        margin-bottom: 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .speech-text {
+        color: #333;
+        font-size: 14px;
+      }
+
+      .speech-display.empty .speech-text {
+        color: #999;
+        font-style: italic;
+      }
+
+      .chat-area {
+        display: flex;
+        flex-direction: column;
+        height: 600px;
+      }
+
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: white;
+      }
+
+      #messages p {
+        margin-bottom: 12px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        line-height: 1.5;
+        font-size: 14px;
+      }
+
+      #messages p:first-child {
+        background: #e3f2fd;
+        color: #1565c0;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      #messages p[id^="msg-"] {
+        background: #f5f5f5;
+        color: #333;
+        border-left: 3px solid #667eea;
+      }
+
+      #messages p:not(:first-child):not([id^="msg-"]) {
+        background: #e8f5e9;
+        color: #2e7d32;
+        text-align: right;
+      }
+
+      .input-area {
+        border-top: 2px solid #e0e0e0;
+        padding: 20px;
+        background: #fafafa;
+      }
+
+      #messageForm {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      #messageForm label {
+        font-weight: 600;
+        color: #666;
+        font-size: 14px;
+      }
+
+      #message {
+        flex: 1;
+        padding: 12px 16px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s ease;
+      }
+
+      #message:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      #sendButton {
+        background: #667eea;
+        color: white;
+      }
+
+      #sendButton:hover:not(:disabled) {
+        background: #5568d3;
+        transform: translateY(-1px);
+      }
+
+      #sendButton:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      #startAudioButton {
+        background: #4caf50;
+        color: white;
+      }
+
+      #startAudioButton:hover:not(:disabled) {
+        background: #45a049;
+        transform: translateY(-1px);
+      }
+
+      #startAudioButton:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .connection-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 20px;
+        font-size: 12px;
+        margin-top: 8px;
+      }
+
+      .connection-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4caf50;
+        margin-right: 6px;
+        animation: pulse 2s infinite;
+      }
+
+      .connection-status.disconnected .connection-dot {
+        background: #f44336;
+        animation: none;
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          grid-template-columns: 1fr;
+        }
+        
+        .status-panel {
+          border-right: none;
+          border-bottom: 1px solid #e0e0e0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🎯 Loan Recovery Agent</h1>
+        <p>Real-time bidirectional streaming with status tracking</p>
+        <div class="connection-status" id="connectionStatus">
+          <div class="connection-dot"></div>
+          <span id="connectionText">Connecting...</span>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <!-- Status Panel -->
+        <div class="status-panel">
+          <!-- Current Status -->
+          <div class="status-section">
+            <h3>Current Status</h3>
+            <div class="status-indicator" id="statusIdle">
+              <div class="status-dot"></div>
+              <div class="status-label">Idle</div>
+            </div>
+            <div class="status-indicator" id="statusListening">
+              <div class="status-dot"></div>
+              <div class="status-label">Listening</div>
+            </div>
+            <div class="status-indicator" id="statusSending">
+              <div class="status-dot"></div>
+              <div class="status-label">Sending Input</div>
+            </div>
+            <div class="status-indicator" id="statusProcessing">
+              <div class="status-dot"></div>
+              <div class="status-label">Agent Processing</div>
+            </div>
+            <div class="status-indicator" id="statusResponding">
+              <div class="status-dot"></div>
+              <div class="status-label">Agent Responding</div>
+            </div>
+          </div>
+
+          <!-- Speech Recognition -->
+          <div class="status-section">
+            <h3>What You're Saying</h3>
+            <div class="speech-display empty" id="speechDisplay">
+              <div class="speech-display-label">Real-time Speech</div>
+              <div class="speech-text" id="speechText">Start speaking...</div>
+            </div>
+          </div>
+
+          <!-- Timing Info -->
+          <div class="status-section">
+            <h3>Timing Info</h3>
+            <div class="timing-info">
+              <div class="timing-row">
+                <span class="timing-label">Last Input:</span>
+                <span class="timing-value" id="lastInputTime">-</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">Processing:</span>
+                <span class="timing-value" id="processingTime">-</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">Response:</span>
+                <span class="timing-value" id="responseTime">-</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">Total:</span>
+                <span class="timing-value" id="totalTime">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+          <div id="messages">
+            <p>Waiting for connection...</p>
+          </div>
+
+          <div class="input-area">
+            <form id="messageForm">
+              <label for="message">Message:</label>
+              <input type="text" id="message" name="message" placeholder="Type your message here..." />
+              <button type="submit" id="sendButton" disabled>Send</button>
+              <button type="button" id="startAudioButton">🎤 Voice Mode</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
