@@ -100,12 +100,13 @@ class VoicePipeline:
             logger.error(f"Error creating session: {e}")
             return False
     
-    async def send_to_adk_agent(self, text: str) -> AsyncIterator[str]:
+    async def send_to_adk_agent(self, text: str, use_streaming: bool = True) -> AsyncIterator[str]:
         """
-        Send transcribed text to ADK agent and get response
+        Send transcribed text to ADK agent and get streaming response
         
         Args:
             text: Transcribed text from STT
+            use_streaming: Enable SSE streaming for faster responses
             
         Yields:
             Text responses from the agent
@@ -113,41 +114,92 @@ class VoicePipeline:
         # Ensure session exists before sending
         await self.ensure_session_exists()
         
-        url = f"{self.adk_api_url}/run"
-        
-        payload = {
-            "appName": self.app_name,
-            "userId": self.user_id,
-            "sessionId": self.session_id,
-            "newMessage": {
-                "role": "user",
-                "parts": [{"text": text}]
+        if use_streaming:
+            # Use SSE streaming endpoint for faster responses
+            url = f"{self.adk_api_url}/run_sse"
+            
+            payload = {
+                "appName": self.app_name,
+                "userId": self.user_id,
+                "sessionId": self.session_id,
+                "newMessage": {
+                    "role": "user",
+                    "parts": [{"text": text}]
+                },
+                "streaming": True  # Enable token-level streaming
             }
-        }
-        
-        logger.info(f"Sending to ADK agent: {text}")
-        
-        try:
-            response = await self.http_client.post(url, json=payload)
             
-            if response.status_code != 200:
-                logger.error(f"ADK API error: {response.status_code} - {response.text}")
-                return
+            logger.info(f"Sending to ADK agent (SSE streaming): {text}")
             
-            # Parse the response (it returns a list of events)
-            events = response.json()
+            try:
+                seen_texts = set()  # Track seen text to avoid duplicates
+                
+                async with self.http_client.stream("POST", url, json=payload) as response:
+                    if response.status_code != 200:
+                        logger.error(f"ADK API error: {response.status_code}")
+                        return
+                    
+                    # Process Server-Sent Events
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # Remove "data: " prefix
+                            try:
+                                event = json.loads(data_str)
+                                
+                                # Extract text from the event
+                                if "content" in event and "parts" in event["content"]:
+                                    for part in event["content"]["parts"]:
+                                        if "text" in part and part["text"]:
+                                            text_response = part["text"].strip()
+                                            
+                                            # Only yield if we haven't seen this exact text before
+                                            if text_response and text_response not in seen_texts:
+                                                seen_texts.add(text_response)
+                                                logger.debug(f"Agent response chunk: {text_response}")
+                                                yield text_response
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse JSON: {data_str}")
+                                continue
+                                
+            except Exception as e:
+                logger.error(f"Error calling ADK agent (SSE): {e}")
+        else:
+            # Fallback to non-streaming endpoint
+            url = f"{self.adk_api_url}/run"
             
-            # Extract text from all events
-            for event in events:
-                if "content" in event and "parts" in event["content"]:
-                    for part in event["content"]["parts"]:
-                        if "text" in part:
-                            text_response = part["text"]
-                            logger.info(f"Agent response: {text_response}")
-                            yield text_response
-                            
-        except Exception as e:
-            logger.error(f"Error calling ADK agent: {e}")
+            payload = {
+                "appName": self.app_name,
+                "userId": self.user_id,
+                "sessionId": self.session_id,
+                "newMessage": {
+                    "role": "user",
+                    "parts": [{"text": text}]
+                }
+            }
+            
+            logger.info(f"Sending to ADK agent: {text}")
+            
+            try:
+                response = await self.http_client.post(url, json=payload)
+                
+                if response.status_code != 200:
+                    logger.error(f"ADK API error: {response.status_code} - {response.text}")
+                    return
+                
+                # Parse the response (it returns a list of events)
+                events = response.json()
+                
+                # Extract text from all events
+                for event in events:
+                    if "content" in event and "parts" in event["content"]:
+                        for part in event["content"]["parts"]:
+                            if "text" in part:
+                                text_response = part["text"]
+                                logger.info(f"Agent response: {text_response}")
+                                yield text_response
+                                
+            except Exception as e:
+                logger.error(f"Error calling ADK agent: {e}")
     
     async def process_transcription(self, transcription_result: dict) -> None:
         """

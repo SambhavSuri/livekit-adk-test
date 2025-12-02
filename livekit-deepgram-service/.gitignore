@@ -9,3 +9,6 @@ env/
 *.log
 .DS_Store
 
+# Performance logs
+logs/*.txt
+!logs/.gitkeep

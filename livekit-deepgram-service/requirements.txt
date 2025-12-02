@@ -6,3 +6,7 @@ httpx
 pyaudio
 sounddevice
 soundfile
+websockets
+aiohttp
+torch
+torchaudio
