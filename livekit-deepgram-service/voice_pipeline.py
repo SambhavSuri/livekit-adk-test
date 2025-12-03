@@ -132,7 +132,7 @@ class VoicePipeline:
             logger.info(f"Sending to ADK agent (SSE streaming): {text}")
             
             try:
-                seen_texts = set()  # Track seen text to avoid duplicates
+                accumulated_text = ""  # Track accumulated text to get only new deltas
                 
                 async with self.http_client.stream("POST", url, json=payload) as response:
                     if response.status_code != 200:
@@ -150,13 +150,21 @@ class VoicePipeline:
                                 if "content" in event and "parts" in event["content"]:
                                     for part in event["content"]["parts"]:
                                         if "text" in part and part["text"]:
-                                            text_response = part["text"].strip()
+                                            full_text = part["text"].strip()
                                             
-                                            # Only yield if we haven't seen this exact text before
-                                            if text_response and text_response not in seen_texts:
-                                                seen_texts.add(text_response)
-                                                logger.debug(f"Agent response chunk: {text_response}")
-                                                yield text_response
+                                            # Calculate the new delta (difference from accumulated)
+                                            if full_text.startswith(accumulated_text):
+                                                # Get only the new text that was added
+                                                new_text = full_text[len(accumulated_text):]
+                                                if new_text:
+                                                    accumulated_text = full_text
+                                                    logger.debug(f"Agent response chunk: {new_text}")
+                                                    yield new_text
+                                            elif full_text and not accumulated_text:
+                                                # First chunk
+                                                accumulated_text = full_text
+                                                logger.debug(f"Agent response chunk: {full_text}")
+                                                yield full_text
                             except json.JSONDecodeError:
                                 logger.warning(f"Failed to parse JSON: {data_str}")
                                 continue
